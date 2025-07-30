@@ -2605,7 +2605,7 @@ def metadata_negative_filter(endpoint_type, conn):
         'Events': ['s3:ObjectCreated:*', 's3:ObjectRemoved:*'],
         'Filter': {
             'Metadata': {
-                'FilterRules': [{'Name': META_PREFIX+meta_key_1, 'Value': meta_value_1, 'Type': 'OUT'}, {'Name': META_PREFIX+meta_key_2, 'Value': meta_value_2, 'Type': 'IN'}]
+                'FilterRules': [{'Name': META_PREFIX+meta_key_1, 'Value': meta_value_1, 'Exclude': True }, {'Name': META_PREFIX+meta_key_2, 'Value': meta_value_2}]
             }
         }
     }]
@@ -2718,7 +2718,7 @@ def key_negative_filter(endpoint_type, conn):
                         'Events': ['s3:ObjectCreated:*'],
                         'Filter': {
                           'Key': {
-                            'FilterRules': [{'Name': 'prefix', 'Value': 'hello', 'Type': 'OUT'}]
+                            'FilterRules': [{'Name': 'prefix', 'Value': 'hello', 'Exclude': True}]
                           }
                         }
                        },
@@ -2727,7 +2727,7 @@ def key_negative_filter(endpoint_type, conn):
                         'Events': ['s3:ObjectCreated:*'],
                         'Filter': {
                           'Key': {
-                            'FilterRules': [{'Name': 'suffix', 'Value': 'log', 'Type': 'OUT'}, {'Name': 'prefix', 'Value': 'world', 'Type': 'IN'}]
+                            'FilterRules': [{'Name': 'suffix', 'Value': 'log', 'Exclude': True }, {'Name': 'prefix', 'Value': 'world'}]
                           }
                         }
                        },
@@ -2736,7 +2736,7 @@ def key_negative_filter(endpoint_type, conn):
                         'Events': [],
                         'Filter': {
                           'Key': {
-                            'FilterRules': [{'Name': 'regex', 'Value': '([a-z]+)\\.txt', 'Type': 'OUT'}]
+                            'FilterRules': [{'Name': 'regex', 'Value': '([a-z]+)\\.txt', 'Exclude': True}]
                          }
                         }
                        }]
@@ -2843,8 +2843,8 @@ def test_zone_filter(endpoint_type, conn):
                         'TopicArn': topic_arn,
                         'Events': ['s3:ObjectCreated:*'],
                         'Filter': {
-                          'Zones': {
-                            'FilterRules': [{'Name': zone, 'Type': 'IN'}]
+                          'S3Zones': {
+                            'FilterRules': [{'Name': zone }]
                           }
                         }
                        },
@@ -2852,8 +2852,8 @@ def test_zone_filter(endpoint_type, conn):
                         'TopicArn': topic_arn,
                         'Events': ['s3:ObjectCreated:*'],
                         'Filter': {
-                          'Zones': {
-                            'FilterRules': [{'Name': zone, 'Type': 'OUT'}]
+                          'S3Zones': {
+                            'FilterRules': [{'Name': zone, 'Exclude': True }]
                           }
                         }
                        }]
