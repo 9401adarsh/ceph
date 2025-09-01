@@ -89,7 +89,7 @@ void rgw_s3_key_filter::dump_xml(Formatter *f) const {
     ::encode_xml("Name", "prefix", f);
     ::encode_xml("Value", prefix_rule, f);
     if(is_prefix_negative) {
-      ::encode_xml("Exclude",  true, f); 
+      ::encode_xml("Exclude",  is_prefix_negative, f); 
     }
     f->close_section();
   }
@@ -127,7 +127,7 @@ void rgw_s3_key_value_filter::dump(Formatter *f) const {
     ::encode_json("Name", key_value_type.first, f);
     ::encode_json("Value", key_value_type.second.first, f);
     if(key_value_type.second.second) {
-      ::encode_json("Exclude", true, f);
+      ::encode_json("Exclude", key_value_type.second.second, f);
     }
     f->close_section();
   }
