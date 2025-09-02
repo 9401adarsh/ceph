@@ -54,26 +54,26 @@ bool rgw_s3_key_filter::decode_xml(XMLObj* obj) {
   auto suffix_not_set = true;
   auto regex_not_set = true;
   std::string name;
-  std::string type; 
+  std::string exclude; 
 
   while ((o = iter.get_next())) {
     RGWXMLDecoder::decode_xml("Name", name, o, throw_if_missing); 
     if (name == "prefix" && prefix_not_set) {
       prefix_not_set = false;
       RGWXMLDecoder::decode_xml("Value", prefix_rule, o, throw_if_missing);
-      if(RGWXMLDecoder::decode_xml("Exclude", type, o, !throw_if_missing)) {
+      if(RGWXMLDecoder::decode_xml("Exclude", exclude, o, !throw_if_missing)) {
         is_prefix_negative = true;
       }
     } else if (name == "suffix" && suffix_not_set) {
       suffix_not_set = false;
       RGWXMLDecoder::decode_xml("Value", suffix_rule, o, throw_if_missing);
-      if(RGWXMLDecoder::decode_xml("Exclude", type, o, !throw_if_missing)) {
+      if(RGWXMLDecoder::decode_xml("Exclude", exclude, o, !throw_if_missing)) {
         is_suffix_negative = true;
       }
     } else if (name == "regex" && regex_not_set) {
       regex_not_set = false;
       RGWXMLDecoder::decode_xml("Value", regex_rule, o, throw_if_missing);
-      if(RGWXMLDecoder::decode_xml("Exclude", type, o, !throw_if_missing)) {
+      if(RGWXMLDecoder::decode_xml("Exclude", exclude, o, !throw_if_missing)) {
         is_regex_negative = true;
       }
     } else {
@@ -122,12 +122,12 @@ void rgw_s3_key_value_filter::dump(Formatter *f) const {
     return;
   }
   f->open_array_section("FilterRules");
-  for (const auto& key_value_type : kve) {
+  for (const auto& key_value_exclude : kve) {
     f->open_object_section("");
-    ::encode_json("Name", key_value_type.first, f);
-    ::encode_json("Value", key_value_type.second.first, f);
-    if(key_value_type.second.second) {
-      ::encode_json("Exclude", key_value_type.second.second, f);
+    ::encode_json("Name", key_value_exclude.first, f);
+    ::encode_json("Value", key_value_exclude.second.first, f);
+    if(key_value_exclude.second.second) {
+      ::encode_json("Exclude", key_value_exclude.second.second, f);
     }
     f->close_section();
   }
@@ -143,27 +143,27 @@ bool rgw_s3_key_value_filter::decode_xml(XMLObj* obj) {
 
   std::string key;
   std::string value;
-  std::string type;
-  bool is_negative; 
+  std::string exclude;
+  bool exclude_flag; 
 
   while ((o = iter.get_next())) {
-    is_negative = false;
+    exclude_flag = false;
     RGWXMLDecoder::decode_xml("Name", key, o, throw_if_missing);
     RGWXMLDecoder::decode_xml("Value", value, o, throw_if_missing);
-    if(RGWXMLDecoder::decode_xml("Exclude", type, o, !throw_if_missing)) {
-      is_negative = true;
+    if(RGWXMLDecoder::decode_xml("Exclude", exclude, o, !throw_if_missing)) {
+      exclude_flag = true;
     }
-    kve.emplace(key, std::make_pair(value, is_negative));
+    kve.emplace(key, std::make_pair(value, exclude_flag));
   }
   return true;
 }
 
 void rgw_s3_key_value_filter::dump_xml(Formatter *f) const {
-  for (const auto& key_value_type : kve) {
+  for (const auto& key_value_exclude : kve) {
     f->open_object_section("FilterRule");
-    ::encode_xml("Name", key_value_type.first, f);
-    ::encode_xml("Value", key_value_type.second.first, f);
-    if(key_value_type.second.second) {
+    ::encode_xml("Name", key_value_exclude.first, f);
+    ::encode_xml("Value", key_value_exclude.second.first, f);
+    if(key_value_exclude.second.second) {
       ::encode_xml("Exclude", true , f);
     }
     f->close_section();
@@ -203,7 +203,7 @@ bool rgw_s3_zone_filter::decode_xml(XMLObj *obj){
   std::unordered_set<std::string> seen; 
   const auto throw_if_missing = true;
   std::string zone; 
-  std::string type; 
+  std::string exclude; 
 
   while ((o = iter.get_next())) {
     RGWXMLDecoder::decode_xml("Name", zone, o, throw_if_missing);
@@ -211,7 +211,7 @@ bool rgw_s3_zone_filter::decode_xml(XMLObj *obj){
       throw RGWXMLDecoder::err("duplicate zone filter rule: '" + zone + "'");
     else 
       seen.insert(zone);
-    if(RGWXMLDecoder::decode_xml("Exclude", type, o, !throw_if_missing)) {
+    if(RGWXMLDecoder::decode_xml("Exclude", exclude, o, !throw_if_missing)) {
       out_list.emplace_back(zone); 
     } else {
       in_list.emplace_back(zone);
@@ -280,10 +280,10 @@ bool match(const rgw_s3_key_filter& filter, const std::string& key) {
   const auto prefix_size = filter.prefix_rule.size();
   if (prefix_size != 0) {
     // prefix rule exists
-    const bool is_negative = filter.is_prefix_negative;
+    const bool exclude_flag = filter.is_prefix_negative;
     if (prefix_size > key_size) {
       // if prefix is longer than key, we fail if filter is positive, else continue
-      if(!is_negative) {
+      if(!exclude_flag) {
         return false; 
       }
     }
@@ -291,17 +291,17 @@ bool match(const rgw_s3_key_filter& filter, const std::string& key) {
     // if prefix matches but filter is negative, we fail
     // else continue
     bool does_prefix_match = std::equal(filter.prefix_rule.begin(), filter.prefix_rule.end(), key.begin()); 
-    if (is_negative == does_prefix_match) {
+    if (exclude_flag == does_prefix_match) {
       return false; 
     }
   }
   const auto suffix_size = filter.suffix_rule.size();
   if (suffix_size != 0) {
     // suffix rule exists
-    const bool is_negative = filter.is_suffix_negative;
+    const bool exclude_flag = filter.is_suffix_negative;
     if (suffix_size > key_size) {
       // if suffix is longer than key, we fail if filter is positive, else continue
-      if(!is_negative) {
+      if(!exclude_flag) {
         return false; 
       }
     }
@@ -309,7 +309,7 @@ bool match(const rgw_s3_key_filter& filter, const std::string& key) {
     // if suffix matches but filter is negative, we fail
     // else continue
     bool does_suffix_match = std::equal(filter.suffix_rule.begin(), filter.suffix_rule.end(), (key.end() - suffix_size));
-    if (is_negative == does_suffix_match) {
+    if (exclude_flag == does_suffix_match) {
       return false;
     }
   }
@@ -319,9 +319,9 @@ bool match(const rgw_s3_key_filter& filter, const std::string& key) {
     // if regex does not match, and if filter is positive, we fail or
     // if regex matches but filter is negative, we fail
     // else continue
-    const bool is_negative = filter.is_regex_negative; 
+    const bool exclude_flag = filter.is_regex_negative; 
     bool does_regex_match = std::regex_match(key, base_regex); 
-    if (is_negative == does_regex_match) {
+    if (exclude_flag == does_regex_match) {
       return false;
     }
   }
@@ -332,11 +332,11 @@ bool match(const rgw_s3_key_value_filter& filter, const KeyValueMap& kv) {
   // all filter pairs must exist with the same value in the object's metadata/tags
   // object metadata/tags may include items not in the filter 
   return std::all_of(filter.kve.begin(), filter.kve.end(), [&](const auto& p){ 
-    bool is_negative = p.second.second; 
+    bool exclude_flag = p.second.second; 
     auto it = kv.find(p.first);
     bool match_negative = it == kv.end() || it->second != p.second.first; 
     bool match_positive = it != kv.end() && it->second == p.second.first;
-    return is_negative ? match_negative : match_positive;
+    return exclude_flag ? match_negative : match_positive;
   });
 }
 
@@ -345,12 +345,12 @@ bool match(const rgw_s3_key_value_filter& filter, const KeyMultiValueMap& kv) {
   // object metadata/tags may include items not in the filter
   for (auto& filter : filter.kve) {
     auto result = kv.equal_range(filter.first);
-    bool is_negative = filter.second.second;
+    bool exclude_flag = filter.second.second;
     // For negative filters, all values must NOT match filter.second.first
     // For positive filters, at least one value must match filter.second.first
     bool match_negative = std::all_of(result.first, result.second, [&filter](const std::pair<std::string, std::string>&p){ return p.second != filter.second.first;}); 
     bool match_positive = std::any_of(result.first, result.second, [&filter](const std::pair<std::string, std::string>&p){ return p.second == filter.second.first;});
-    if((is_negative && !match_negative) || (!is_negative && !match_positive)) {
+    if((exclude_flag && !match_negative) || (!exclude_flag && !match_positive)) {
       return false;
     }
   }
